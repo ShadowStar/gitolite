@@ -206,6 +206,8 @@ sub new_repo {
     _mkdir("$repo.git");
     _chdir("$repo.git");
     _system("git init --bare >&2");
+    _system("git config receive.denyNonFastForwards = true");
+    _system("git config receive.denyDeletes = true");
     _chdir( $rc{GL_REPO_BASE} );
     hook_1($repo);
 }
