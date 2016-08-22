@@ -36,8 +36,10 @@ sub input {
         _die "$hn: '$repo' is native"                       if $mode eq 'master';
         _die "$hn: '$sender' is not the master for '$repo'" if $master ne $sender;
 
+        $ENV{GL_BYPASS_CREATOR_CHECK} = option($repo, "bypass-creator-check");
         # this expects valid perms content on STDIN
         _system("gitolite perms -c $repo");
+        delete $ENV{GL_BYPASS_CREATOR_CHECK};
 
         # we're done.  Yes, really...
         exit 0;
@@ -233,9 +235,11 @@ sub push_to_slaves {
     my $u = $ENV{GL_USER};
     delete $ENV{GL_USER};    # why?  see src/commands/mirror
 
+    my $lb = "$ENV{GL_REPO_BASE}/$repo.git/.gl-mirror-lock";
     for my $s ( sort keys %slaves ) {
-        system("gitolite mirror push $s $repo </dev/null >/dev/null 2>&1 &") if $slaves{$s} eq 'async';
-        system("gitolite mirror push $s $repo </dev/null >/dev/null 2>&1")   if $slaves{$s} eq 'sync';
+        trace( 1, "push_to_slaves: skipping self" ), next if $s eq $hn;
+        system("gitolite 1plus1 $lb.$s gitolite mirror push $s $repo </dev/null >/dev/null 2>&1 &") if $slaves{$s} eq 'async';
+        system("gitolite 1plus1 $lb.$s gitolite mirror push $s $repo </dev/null >/dev/null 2>&1")   if $slaves{$s} eq 'sync';
         _warn "manual mirror push pending for '$s'"                          if $slaves{$s} eq 'nosync';
     }
 

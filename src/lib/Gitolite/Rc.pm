@@ -67,7 +67,7 @@ if ( -r $rc and -s $rc ) {
 }
 if ( defined($GL_ADMINDIR) ) {
     say2 "";
-    say2 "FATAL: '$rc' seems to be for older gitolite; please see doc/g2migr.mkd\n" . "(online at http://gitolite.com/gitolite/g2migr.html)";
+    say2 "FATAL: '$rc' seems to be for older gitolite; please see\nhttp://gitolite.com/gitolite/migr.html";
 
     exit 1;
 }
@@ -215,6 +215,7 @@ sub glrc {
 }
 
 my $all   = 0;
+my $dump  = 0;
 my $nonl  = 0;
 my $quiet = 0;
 
@@ -228,6 +229,13 @@ sub query_rc {
         for my $e ( sort keys %rc ) {
             print "$e=" . ( defined( $rc{$e} ) ? $rc{$e} : 'undef' ) . "\n";
         }
+        exit 0;
+    }
+
+    if ($dump) {
+        require Data::Dumper;
+        $Data::Dumper::Sortkeys = 1;
+        print Data::Dumper::Dumper \%rc;
         exit 0;
     }
 
@@ -350,9 +358,11 @@ sub _which {
 
 =for args
 Usage:  gitolite query-rc -a
+        gitolite query-rc -d
         gitolite query-rc [-n] [-q] rc-variable
 
     -a          print all variables and values (first level only)
+    -d          dump the entire rc structure
     -n          do not append a newline if variable is scalar
     -q          exit code only (shell truth; 0 is success)
 
@@ -379,6 +389,7 @@ Explore:
     gitolite query-rc -a
     # prints all first level variables and values, one per line.  Any that are
     # listed as HASH or ARRAY can be explored further in subsequent commands.
+    gitolite query-rc -d                # dump the entire rc structure
 =cut
 
 sub args {
@@ -387,13 +398,14 @@ sub args {
     require Getopt::Long;
     Getopt::Long::GetOptions(
         'all|a'   => \$all,
+        'dump|d'  => \$dump,
         'nonl|n'  => \$nonl,
         'quiet|q' => \$quiet,
         'help|h'  => \$help,
     ) or usage();
 
-    usage("'-a' cannot be combined with other arguments or options") if $all and ( @ARGV or $nonl or $quiet );
-    usage() if not $all and not @ARGV or $help;
+    _die("'-a' cannot be combined with other arguments or options; run with '-h' for usage") if $all and ( @ARGV or $dump or $nonl or $quiet );
+    usage() if not $all and not $dump and not @ARGV or $help;
     return @ARGV;
 }
 
@@ -452,6 +464,8 @@ BEGIN {
     git-config              POST_COMPILE    post-compile/update-git-configs
     git-config              POST_CREATE     post-compile/update-git-configs
 
+    create-with-reference   POST_CREATE     post-compile/create-with-reference
+
     gitweb                  POST_CREATE     post-compile/update-gitweb-access-list
     gitweb                  POST_COMPILE    post-compile/update-gitweb-access-list
 
@@ -497,12 +511,17 @@ __DATA__
 
     # comment out if you don't need all the extra detail in the logfile
     LOG_EXTRA                       =>  1,
-    # syslog options
-    # 1. leave this section as is for normal gitolite logging
-    # 2. uncomment this line to log only to syslog:
+    # logging options
+    # 1. leave this section as is for 'normal' gitolite logging (default)
+    # 2. uncomment this line to log ONLY to syslog:
     # LOG_DEST                      => 'syslog',
     # 3. uncomment this line to log to syslog and the normal gitolite log:
     # LOG_DEST                      => 'syslog,normal',
+    # 4. prefixing "repo-log," to any of the above will **also** log just the
+    #    update records to "gl-log" in the bare repo directory:
+    # LOG_DEST                      => 'repo-log,normal',
+    # LOG_DEST                      => 'repo-log,syslog',
+    # LOG_DEST                      => 'repo-log,syslog,normal',
 
     # roles.  add more roles (like MANAGER, TESTER, ...) here.
     #   WARNING: if you make changes to this hash, you MUST run 'gitolite
@@ -543,7 +562,7 @@ __DATA__
 
         # or you can use this, which lets you put everything in a subdirectory
         # called "local" in your gitolite-admin repo.  For a SECURITY WARNING
-        # on this, see http://gitolite.com/gitolite/cust.html#pushcode
+        # on this, see http://gitolite.com/gitolite/non-core.html#pushcode
         # LOCAL_CODE                =>  "$rc{GL_ADMIN_BASE}/local",
 
     # ------------------------------------------------------------------

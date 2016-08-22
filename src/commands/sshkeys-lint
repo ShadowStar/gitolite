@@ -4,6 +4,8 @@ use warnings;
 
 # complete rewrite of the sshkeys-lint program.  Usage has changed, see
 # usage() function or run without arguments.
+use lib $ENV{GL_LIBDIR};
+use Gitolite::Common;
 
 use Getopt::Long;
 my $admin = 0;
@@ -17,13 +19,7 @@ $|++;
 
 my $in_gl_section = 0;
 my $warnings      = 0;
-
-sub dbg {
-    use Data::Dumper;
-    for my $i (@_) {
-        print STDERR "DBG: " . Dumper($i);
-    }
-}
+my $KEYTYPE_REGEX = qr/\b(?:ssh-(?:rsa|dss|ed25519)|ecdsa-sha2-nistp(?:256|384|521))\b/;
 
 sub msg {
     my $warning = shift;
@@ -126,7 +122,7 @@ sub user {
     my $user = '';
     $user ||= "user $1"         if /^command=.*gitolite-shell (.*?)"/;
     $user ||= "unknown command" if /^command/;
-    $user ||= "shell access"    if /^ssh-(rsa|dss)/;
+    $user ||= "shell access"    if /$KEYTYPE_REGEX/;
 
     return $user;
 }
@@ -141,34 +137,24 @@ sub ak_comment {
 
 sub fprint {
     local $_ = shift;
-    my ( $fh, $tempfn, $in );
-    if ( /ssh-(dss|rsa) / || /ecdsa-/ ) {
-        # an actual key was passed.  Since ssh-keygen requires an actual file,
-        # make a temp file to take the data and pass on to ssh-keygen
-        s/^.* (ssh-dss|ssh-rsa|ecdsa-\S+)/$1/;
-        use File::Temp qw(tempfile);
-        ( $fh, $tempfn ) = tempfile();
-        $in = $tempfn;
-        print $fh $_;
-        close $fh;
+    my ($fp, $output);
+    if ( /$KEYTYPE_REGEX/ ) {
+        # an actual key was passed. ssh-keygen CAN correctly handle options on
+        # the front of the key, so don't bother to strip them at all.
+        ($fp, $output) = ssh_fingerprint_line($_);
     } else {
         # a filename was passed
-        $in = $_;
+        ($fp, $output) = ssh_fingerprint_file($_);
+        # include the line of input as well, as it won't always be included by the ssh-keygen command
+        warn "Bad line: $_\n" unless $fp;
     }
-    # dbg("in = $in");
-    -f $in or die "file not found: $in\n";
-    open( $fh, "ssh-keygen -l -f $in |" ) or die "could not fork: $!\n";
-    my $fp = <$fh>;
-    # dbg("fp = $fp");
-    close $fh;
-    unlink $tempfn if $tempfn;
-    warn "$fp\n" unless $fp =~ /([0-9a-f][0-9a-f](:[0-9a-f][0-9a-f])+)/;
-    return $1;
+    # sshkeys-lint should only be run by a trusted admin, so we can give the output here.
+    warn "$output\n" unless $fp;
+    return $fp;
 }
 
 # ------------------------------------------------------------------------
-sub usage {
-    print <<EOF;
+=for usage
 
 Usage:  gitolite sshkeys-lint [-q] [optional list of pubkey filenames]
         (optionally, STDIN can be a pipe or redirected from a file; see below)
@@ -187,6 +173,4 @@ Note that this runs ssh-keygen -l for each line in the authkeys file and each
 pubkey in the argument list, so be wary of running it on something huge.  This
 is meant for troubleshooting.
 
-EOF
-    exit 1;
-}
+=cut

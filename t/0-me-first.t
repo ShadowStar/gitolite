@@ -22,6 +22,7 @@ confreset;confadd '
     repo cc/..*
         C       =   u4
         RW+     =   CREATOR u5
+        R       =   READERS
 ';
 
 try "ADMIN_PUSH set1; !/FATAL/" or die text();
@@ -88,7 +89,6 @@ try "
                                     !ok;    /FATAL: 'cc/../../../../../..$rb/gitolite-admin' contains '\\.\\.'/
 
     glt perms u4 -c cc/bar/baz/../frob + READERS u2
-                                    !ok;    /FATAL: 'cc/bar/baz/\\.\\./frob' contains '\\.\\.'/
-
+                                    !ok;    /FATAL: no relative paths allowed anywhere!/
 
 ";

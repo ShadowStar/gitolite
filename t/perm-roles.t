@@ -63,8 +63,8 @@ glt push u1 file:///foo/u1/u1r1 t1
         POK; /\\[new tag\\]         t1 -> t1/
 
 # add u2 to WRITERS
-echo WRITERS \@g2 | glt perms u1 foo/u1/u1r1
-glt perms u1 -l foo/u1/u1r1
+echo WRITERS \@g2 | glt perms u1 -c foo/u1/u1r1
+glt perms u1 foo/u1/u1r1 -l
         /WRITERS \@g2/
 
 glt fetch u1
@@ -95,8 +95,8 @@ glt push u2 file:///foo/u1/u1r1 t2
         reject
 
 # change u2 to READERS
-echo READERS u2 | glt perms u1 foo/u1/u1r1
-glt perms u1 -l foo/u1/u1r1
+echo READERS u2 | glt perms u1 -c foo/u1/u1r1
+glt perms u1 foo/u1/u1r1 -l
         /READERS u2/
 
 glt fetch u1
@@ -108,7 +108,7 @@ glt push u2 file:///foo/u1/u1r1 master:master
         /W any foo/u1/u1r1 u2 DENIED by fallthru/
 
 # add invalid category MANAGERS
-    /usr/bin/printf 'READERS u6\\nMANAGERS u2\\n' | glt perms u1 foo/u1/u1r1
+    /usr/bin/printf 'READERS u6\\nMANAGERS u2\\n' | glt perms u1 -c foo/u1/u1r1
         !ok
         /Invalid role 'MANAGERS'/
 ";
@@ -120,9 +120,9 @@ put "$ENV{HOME}/g3trc", "\$rc{ROLES}{MANAGERS} = 1;\n";
 try "
     ENV G3T_RC=$ENV{HOME}/g3trc
     gitolite compile;   ok or die compile failed
-    /usr/bin/printf 'READERS u6\\nMANAGERS u2\\n' | glt perms u1 foo/u1/u1r1
+    /usr/bin/printf 'READERS u6\\nMANAGERS u2\\n' | glt perms u1 -c foo/u1/u1r1
                             ok;    !/Invalid role 'MANAGERS'/
-    glt perms u1 -l foo/u1/u1r1
+    glt perms u1 foo/u1/u1r1 -l
 ";
 
 cmp 'READERS u6
@@ -156,7 +156,7 @@ glt push u2 file:///foo/u1/u1r1 t3
         POK; /\\[new tag\\]         t3 -> t3/
 
 # add invalid category TESTERS
-echo TESTERS u2 | glt perms u1 foo/u1/u1r1
+echo TESTERS u2 | glt perms u1 -c foo/u1/u1r1
         !ok
         /Invalid role 'TESTERS'/
 ";
@@ -167,9 +167,9 @@ put "|cat >> $ENV{HOME}/g3trc", "\$rc{ROLES}{TESTERS} = 1;\n";
 try "
 gitolite compile;   ok or die compile failed
 # add u2 to now valid TESTERS
-echo TESTERS u2 | glt perms u1 foo/u1/u1r1
+echo TESTERS u2 | glt perms u1 -c foo/u1/u1r1
         !/Invalid role 'TESTERS'/
-glt perms u1 -l foo/u1/u1r1
+glt perms u1 foo/u1/u1r1 -l
 ";
 
 cmp 'TESTERS u2

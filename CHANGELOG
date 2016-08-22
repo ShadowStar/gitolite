@@ -1,3 +1,69 @@
+2016-02-20  v3.6.5  allow creator check to be bypassed during mirroring
+
+                    handle new style ssh fingerprinting correctly (thanks to
+                    Robin Johnson)
+
+                    allow pre-auto-gc as a repo-specific hook
+
+                    optimise mirror pushes for heavily used repos
+
+                    create-with-reference trigger: on repo creation, setup
+                    objects/info/alternates for a server side alternate object
+                    store.
+
+                    'mirror status all all' prints a list of repos that have
+                    *some* error, which is arguably more useful for further
+                    action/processing
+
+                    allow incrementally adding more repo-specific hooks
+
+2015-11-01  v3.6.4  a ref-create bug in wild repos was fixed
+
+                    some contrib code related to AD integration, and to
+                    redmine user aliases
+
+                    teach Alias.pm a few new tricks
+
+                    remove a race condition in 'create' command that affected
+                    the 'default roles' setting
+
+                    make 'who-pushed' more efficient (local push logs, and
+                    'tip search')
+
+                    'gitolite query-rc' learns '-d' ('--dump') option
+
+2015-04-26  v3.6.3  allow limited use of 'git config' using the new 'config'
+                    command
+
+                    accept openssh 6.8's new fingerprint output format
+
+                    (finally!) allow limited symlinks within ~/repositories;
+                    see commit 8e36230 for details
+
+                    perms command now lists available roles
+
+                    minor backward compat breakage: 'perms -l repo' no longer
+                    works; see 'perms -h' for new usage
+
+                    allow gitolite-shell to be used as $SHELL (experts only;
+                    no support, no docs; see commit 9cd1e37 for details)
+
+                    help with 'git push --signed' using a post-receive hook to
+                    adopt push certs into 'refs/push-certs'; for details see
+                    contrib/hooks/repo-specific/save-push-signatures
+
+                    new 'transparent proxy' feature for git repos; see
+                    src/lib/Gitolite/Triggers/TProxy.pm for details
+
+2014-11-10  v3.6.2  disable ../ everywhere (see mailing list thread for
+                    details)
+
+                    VREF/NAME_NC -- like VREF/NAME but for new commits only.
+                    Details within src/VREF/NAME_NC.
+
+                    allow gitolite.conf to be tested locally; details within
+                    contrib/utils/gitolite-local
+
 2014-06-22  v3.6.1  experimental rc format convertor for "<= 3.3" users who
                     have already upgraded the *code* to ">= v3.4".  Program is
                     in contrib/utils.

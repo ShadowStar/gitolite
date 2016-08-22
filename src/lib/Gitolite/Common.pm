@@ -16,10 +16,14 @@ package Gitolite::Common;
           dd
           t_start
           t_lap
+
+          ssh_fingerprint_file
+          ssh_fingerprint_line
 );
 #>>>
 use Exporter 'import';
 use File::Path qw(mkpath);
+use File::Temp qw(tempfile);
 use Carp qw(carp cluck croak confess);
 
 use strict;
@@ -113,13 +117,13 @@ sub _die {
 $SIG{__DIE__} = \&_die;
 
 sub usage {
-    _warn(shift) if @_;
     my $script = (caller)[1];
-    my $function = ( ( ( caller(1) )[3] ) || ( ( caller(0) )[3] ) );
+    my $function = shift if @_ and $_[0] =~ /^[\w-]+$/;
+    $function ||= ( ( ( caller(1) )[3] ) || ( ( caller(0) )[3] ) );
     $function =~ s/.*:://;
     my $code = slurp($script);
     $code =~ /^=for $function\b(.*?)^=cut/sm;
-    say2( $1 ? $1 : "...no usage message in $script" );
+    say( $1 ? $1 : "...no usage message for '$function' in $script" );
     exit 1;
 }
 
@@ -226,9 +230,11 @@ sub cleanup_conf_line {
         # receiving *any* arg invalidates cache)
         return \@phy_repos if ( @phy_repos and not @_ );
 
-        for my $repo (`find . -name "*.git" -prune`) {
+        my $cmd = 'find . ' . ($Gitolite::Rc::rc{REPO_SYMLINKS} || '') . ' -name "*.git" -prune';
+        for my $repo (`$cmd`) {
             chomp($repo);
-            $repo =~ s(\./(.*)\.git$)($1);
+            $repo =~ s/\.git$//;
+            $repo =~ s(^\./)();
             push @phy_repos, $repo;
         }
         trace( 3, scalar(@phy_repos) . " physical repos found" );
@@ -280,8 +286,19 @@ sub gl_log {
     my $ts = gen_ts();
     my $tid = $ENV{GL_TID} ||= $$;
 
-    # syslog
     $log_dest = $Gitolite::Rc::rc{LOG_DEST} || '' if not defined $log_dest;
+
+    # log (update records only) to "gl-log" in the bare repo dir; this is to
+    # make 'who-pushed' more efficient.  Since this is only for the update
+    # records, it is not a replacement for the other two types of logging.
+    if ($log_dest =~ /repo-log/ and $_[0] eq 'update') {
+        # if the log line is 'update', we're already in the bare repo dir
+        open my $lfh, ">>", "gl-log" or _die "open gl-log failed: $!";
+        print $lfh "$ts\t$tid\t$msg\n";
+        close $lfh;
+    }
+
+    # syslog
     if ($log_dest =~ /syslog/) {            # log_dest *includes* syslog
         if ($syslog_opened == 0) {
             require Sys::Syslog;
@@ -299,7 +316,7 @@ sub gl_log {
         # the priority/level of the syslog message.
         syslog( ( $msg =~ /^\t/ ? 'debug' : 'info' ), "%s", $msg);
 
-        return if $log_dest eq 'syslog';    # log_dest *equals* syslog
+        return if $log_dest !~ /normal/;
     }
 
     my $fh;
@@ -317,6 +334,44 @@ sub logger_plus_stderr {
         print $fh "FATAL: $_\n";
     }
     exit 1;
+}
+
+# ----------------------------------------------------------------------
+# Get the SSH fingerprint of a file
+# If the fingerprint cannot be parsed, it will be undef
+# In a scalar context, returns the fingerprint
+# In a list context, returns (fingerprint, output) where output
+# is the raw output of the ssh-keygen command
+sub ssh_fingerprint_file {
+    my $in = shift;
+    -f $in or die "file not found: $in\n";
+    my $fh;
+    open( $fh, "ssh-keygen -l -f $in |" ) or die "could not fork: $!\n";
+    my $output = <$fh>;
+    chomp $output;
+    # dbg("fp = $fp");
+    close $fh;
+    # Return a valid fingerprint or undef
+    my $fp = undef;
+    if($output =~ /((?:MD5:)?(?:[0-9a-f]{2}:){15}[0-9a-f]{2})/i or
+       $output =~ m{((?:RIPEMD|SHA)\d+:[A-ZA-z0-9+/=]+)}i) {
+        $fp = $1;
+    }
+    return wantarray ? ($fp, $output) : $fp;
+}
+
+# Get the SSH fingerprint of a line of text
+# If the fingerprint cannot be parsed, it will be undef
+# In a scalar context, returns the fingerprint
+# In a list context, returns (fingerprint, output) where output
+# is the raw output of the ssh-keygen command
+sub ssh_fingerprint_line {
+    my ( $fh, $fn ) = tempfile();
+    print $fh shift() . "\n";
+    close $fh;
+    my ($fp,$output) = ssh_fingerprint_file($fn);
+    unlink $fn;
+    return wantarray ? ($fp,$output) : $fp;
 }
 
 # ----------------------------------------------------------------------
